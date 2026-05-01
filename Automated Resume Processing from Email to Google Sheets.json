@@ -1,0 +1,2429 @@
+{
+  "name": "Automated Resume Processing from Email to Google Sheets",
+  "nodes": [
+    {
+      "parameters": {
+        "operation": "pdf",
+        "binaryPropertyName": "attachment",
+        "options": {}
+      },
+      "id": "402ae36f-e85c-4d68-adc3-88ede1202dc7",
+      "name": "Extract Text from PDF",
+      "type": "n8n-nodes-base.extractFromFile",
+      "typeVersion": 1.1,
+      "position": [
+        -2352,
+        204
+      ]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $('08 - Prepare Dedupe Lookup').first().json.text }}",
+        "hasOutputParser": true,
+        "options": {
+          "systemMessage": "=You are a resume analysis expert specializing in industrial, \nwelding, and manufacturing recruitment.\n\nAVAILABLE JOB OPENINGS:\n{{ $('Get Job Openings').all().map(item => \n  '- ' + (item.json.fields?.['Position Title'] || item.json['Position Title']) + \n  ' | Client: ' + (item.json.fields?.['Company name'] || item.json['Company name'] || 'N/A') + \n  ' | Urgency: ' + (item.json.fields?.['Urgency Level'] || item.json['Urgency Level'] || 'Normal')\n).join('\\n') }}\n\nExtract structured information from the provided resume text.\nFor Position_Applied, you MUST choose one of the positions listed above.\nPrioritize matching to \"Urgent\" positions when the candidate qualifies.\nIf no position matches well, choose the closest one and reflect it in a lower AI_Score.\n\nIMPORTANT: The resume may be in English or Spanish. Extract information in whatever language it appears. Your structured output fields must always be in English labels but the values can reflect the original resume language for Skills and AI_Summary. For AI_Summary, always write in English regardless of resume language."
+        }
+      },
+      "id": "bd8c2ad0-b3c8-491c-a099-fc3b4c8852a8",
+      "name": "AI Agent - Resume Analyzer",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        -560,
+        372
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $('Gmail Trigger').item.json.from.value[0].address }}",
+        "subject": "=Application Received - {{ $('Analyzed CVs').item.json.fields['Suggested Position'] }}",
+        "emailType": "text",
+        "message": "={{ 'Dear ' + $('Analyzed CVs').item.json.fields['Candidate Name'] + ',\\n\\nThank you for submitting your application. We have successfully received your resume and it is currently under review.\\n\\nOur team will contact you within 3-5 business days if your profile matches our current openings.\\n\\nBest regards,\\nHR Team' }}",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "id": "9ff39534-6db4-4c2d-bcf6-0c74ad7cc177",
+      "name": "Send Confirmation Email",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        816,
+        248
+      ],
+      "webhookId": "44b225fc-e4ff-400a-bc48-67481f464029",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "ywLQQstLkR9YAjZH",
+          "name": "Gmail account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "gpt-4o",
+          "mode": "list",
+          "cachedResultName": "gpt-4o"
+        },
+        "builtInTools": {},
+        "options": {
+          "maxTokens": 4000
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.3,
+      "position": [
+        -552,
+        596
+      ],
+      "id": "28a69d00-42e1-44bb-adf4-7c2bc5b88665",
+      "name": "OpenAI Chat Model",
+      "credentials": {
+        "openAiApi": {
+          "id": "y1kwjvxVnW3RCR04",
+          "name": "OpenAi account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "id-1",
+              "leftValue": "={{ $json.attachment_count }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "0226c01a-0b96-4654-877d-a7b788626166",
+      "name": "02 - IF Has Attachments",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -3248,
+        740
+      ]
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.file_extension }}",
+                    "rightValue": "pdf",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "2149a267-229c-478c-945c-9aa9ef44e3c8"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "PDF"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.file_extension }}",
+                    "rightValue": "^(doc|docx)$",
+                    "operator": {
+                      "type": "string",
+                      "operation": "regex"
+                    },
+                    "id": "baa64593-47a0-4b62-bd67-e7b8f9a2d4bb"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "DOC_DOCX"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.file_extension }}",
+                    "rightValue": "^(png|jpg|jpeg)$",
+                    "operator": {
+                      "type": "string",
+                      "operation": "regex"
+                    },
+                    "id": "d722c490-0662-4b7e-81e6-250394aed86c"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Images"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "b6c5f1f1-c33b-44c3-b32a-14dcc47d2835",
+      "name": "05 - Route by File Type",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [
+        -2800,
+        532
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.ocr.space/parse/image",
+        "sendBody": true,
+        "contentType": "multipart-form-data",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "parameterType": "formBinaryData",
+              "name": "file",
+              "inputDataFieldName": "=data"
+            },
+            {
+              "name": "apikey",
+              "value": "={{ $env.OCR_SPACE_API_KEY }}"
+            },
+            {
+              "name": "language",
+              "value": "eng"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "id": "44ae4d14-f833-4871-9017-6a00a85e5a51",
+      "name": "06b - OCR for Images",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        -2576,
+        740
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "id-1",
+              "name": "dedupe_key",
+              "value": "={{ $('Code in JavaScript1').item.json.from_email + '|' + $('Code in JavaScript1').item.json.file_name + '|' + $json.text.trim().substring(0, 200).replace(/\\s+/g, ' ') }}",
+              "type": "string"
+            },
+            {
+              "id": "id-2",
+              "name": "text",
+              "value": "={{ $json.text }}",
+              "type": "string"
+            },
+            {
+              "id": "id-3",
+              "name": "attachment_name",
+              "value": "={{ $('Code in JavaScript1').item.json.file_name }}\n",
+              "type": "string"
+            },
+            {
+              "id": "id-4",
+              "name": "message_id",
+              "value": "={{ $('Code in JavaScript1').item.json.message_id }}\n",
+              "type": "string"
+            },
+            {
+              "id": "id-5",
+              "name": "from_email",
+              "value": "={{ $('Code in JavaScript1').item.json.from_email }}\n",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "ca48bff4-b548-47dc-87c0-753da5c6795f",
+      "name": "08 - Prepare Dedupe Lookup",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -1904,
+        248
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "id-1",
+              "leftValue": "={{$json.id}}",
+              "rightValue": 0,
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "57a89bf3-3275-40ce-85a9-8c59a07c5f13",
+      "name": "10 - IF Is Duplicate",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -1456,
+        248
+      ]
+    },
+    {
+      "parameters": {
+        "inputDataFieldName": "attachment",
+        "name": "={{ $('Code in JavaScript1').item.json.file_name }}",
+        "driveId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "My Drive"
+        },
+        "folderId": {
+          "__rl": true,
+          "value": "1nliMRELAI5UT3doZgw-JhkUBQVTPDWUe",
+          "mode": "list",
+          "cachedResultName": "Incoming_Resumes",
+          "cachedResultUrl": "https://drive.google.com/drive/folders/1nliMRELAI5UT3doZgw-JhkUBQVTPDWUe"
+        },
+        "options": {}
+      },
+      "id": "21ef1fb3-2211-4735-8e1d-ed587feb1db3",
+      "name": "11 - Upload to Google Drive",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        -784,
+        372
+      ],
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "PElDJzss4lyo7A2r",
+          "name": "Google Drive account"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "id-9",
+              "name": "dedupe_key",
+              "value": "={{ $('08 - Prepare Dedupe Lookup').first().json.dedupe_key }}",
+              "type": "string"
+            },
+            {
+              "id": "id-1",
+              "name": "Full_Name",
+              "value": "={{ $('AI Agent - Resume Analyzer').item.json.output.Full_Name }}",
+              "type": "string"
+            },
+            {
+              "id": "id-2",
+              "name": "Email",
+              "value": "={{ $('AI Agent - Resume Analyzer').item.json.output.Email }}",
+              "type": "string"
+            },
+            {
+              "id": "id-3",
+              "name": "Phone",
+              "value": "={{ $('AI Agent - Resume Analyzer').item.json.output.Phone }}",
+              "type": "string"
+            },
+            {
+              "id": "id-4",
+              "name": "Years_Experience",
+              "value": "={{ parseInt($('AI Agent - Resume Analyzer').item.json.output.Years_Experience) || 0 }}",
+              "type": "number"
+            },
+            {
+              "id": "id-5",
+              "name": "Position_Applied",
+              "value": "={{ $('AI Agent - Resume Analyzer').item.json.output.Position_Applied }}",
+              "type": "string"
+            },
+            {
+              "id": "26e2bc3e-c5cb-4b4c-a020-66f3497f7963",
+              "name": "Location",
+              "value": "={{ $('AI Agent - Resume Analyzer').item.json.output.Location }}",
+              "type": "string"
+            },
+            {
+              "id": "0edc28f0-8419-4d17-b316-40c4ff3c3084",
+              "name": "Skills",
+              "value": "={{ $('AI Agent - Resume Analyzer').item.json.output.Skills }}",
+              "type": "string"
+            },
+            {
+              "id": "id-6",
+              "name": "Education",
+              "value": "={{ $('AI Agent - Resume Analyzer').item.json.output.education || 'N/A' }}",
+              "type": "string"
+            },
+            {
+              "id": "id-7",
+              "name": "current_position",
+              "value": "={{ $('AI Agent - Resume Analyzer').item.json.output.current_position || 'N/A' }}",
+              "type": "string"
+            },
+            {
+              "id": "id-8",
+              "name": "Resume_Link",
+              "value": "={{ $('11 - Upload to Google Drive').item.json.webViewLink || '' }}",
+              "type": "string"
+            },
+            {
+              "id": "id-10",
+              "name": "Date_Added",
+              "value": "={{ $now.toISO() }}",
+              "type": "string"
+            },
+            {
+              "id": "id-11",
+              "name": "Status",
+              "value": "={{ $('11 - Upload to Google Drive').item.json.error ? 'OK_NO_STORAGE' : 'OK' }}",
+              "type": "string"
+            },
+            {
+              "id": "85ec2a86-aa68-438b-9586-e8782dfadbc7",
+              "name": "AI_Score",
+              "value": "={{ $('AI Agent - Resume Analyzer').item.json.output.AI_Score }}",
+              "type": "string"
+            },
+            {
+              "id": "b3dc0c98-4316-4cef-baaf-c45db6505ea4",
+              "name": "AI_Summary",
+              "value": "={{ $('AI Agent - Resume Analyzer').item.json.output.AI_Summary }}",
+              "type": "string"
+            },
+            {
+              "id": "177ff9c5-3b6c-4920-ad54-caa2c15b6668",
+              "name": "Interview_Score",
+              "value": "",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "4473f2ba-871e-4dc6-a535-752932559048",
+      "name": "12 - Enhanced Prepare Sheet Data",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        16,
+        248
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "id-1",
+              "name": "timestamp",
+              "value": "={{ $now.toISO() }}",
+              "type": "string"
+            },
+            {
+              "id": "id-2",
+              "name": "status",
+              "value": "ERROR_NO_ATTACHMENTS",
+              "type": "string"
+            },
+            {
+              "id": "id-3",
+              "name": "message_id",
+              "value": "={{ $('01 - Check Attachments Exist').item.json.message_id }}",
+              "type": "string"
+            },
+            {
+              "id": "id-4",
+              "name": "from_email",
+              "value": "={{ $('01 - Check Attachments Exist').item.json.from_email }}",
+              "type": "string"
+            },
+            {
+              "id": "id-5",
+              "name": "error_message",
+              "value": "No attachments found in email",
+              "type": "string"
+            },
+            {
+              "id": "id-6",
+              "name": "attachment_name",
+              "value": "N/A",
+              "type": "string"
+            },
+            {
+              "id": "event_type_id",
+              "name": "event_type",
+              "value": "NO_ATTACHMENT",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "c85f973d-6b36-4c7b-b76f-5912831d5b8c",
+      "name": "Log - No Attachments",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1040,
+        908
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "id-1",
+              "name": "timestamp",
+              "value": "={{ $now.toISO() }}",
+              "type": "string"
+            },
+            {
+              "id": "id-2",
+              "name": "status",
+              "value": "DUPLICATE",
+              "type": "string"
+            },
+            {
+              "id": "id-3",
+              "name": "message_id",
+              "value": "={{ $('08 - Prepare Dedupe Lookup').item.json.message_id }}",
+              "type": "string"
+            },
+            {
+              "id": "id-4",
+              "name": "from_email",
+              "value": "={{ $('08 - Prepare Dedupe Lookup').item.json.from_email }}",
+              "type": "string"
+            },
+            {
+              "id": "id-5",
+              "name": "attachment_name",
+              "value": "={{ $('08 - Prepare Dedupe Lookup').item.json.attachment_name }}",
+              "type": "string"
+            },
+            {
+              "id": "id-6",
+              "name": "error_message",
+              "value": "={{ 'Duplicate resume detected: ' + $('08 - Prepare Dedupe Lookup').item.json.dedupe_key }}",
+              "type": "string"
+            },
+            {
+              "id": "event_type_id",
+              "name": "event_type",
+              "value": "DUPLICATE",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "944691d9-a4ba-4591-b6ad-3226c320fcbf",
+      "name": "Log - Duplicate Found",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1040,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "id-1",
+              "name": "timestamp",
+              "value": "={{ $now.toISO() }}",
+              "type": "string"
+            },
+            {
+              "id": "id-2",
+              "name": "status",
+              "value": "ERROR_EXTRACTION",
+              "type": "string"
+            },
+            {
+              "id": "id-3",
+              "name": "message_id",
+              "value": "={{ $('Gmail Trigger').item.json.id }}",
+              "type": "string"
+            },
+            {
+              "id": "id-4",
+              "name": "from_email",
+              "value": "={{ $('Gmail Trigger').item.json.headers.from }}",
+              "type": "string"
+            },
+            {
+              "id": "id-5",
+              "name": "attachment_name",
+              "value": "={{ Object.keys($('Gmail Trigger').item.binary)[0] }}",
+              "type": "string"
+            },
+            {
+              "id": "id-6",
+              "name": "error_message",
+              "value": "empty_or_too_short_extracted_text",
+              "type": "string"
+            },
+            {
+              "id": "event_type_id",
+              "name": "event_type",
+              "value": "EXTRACTION_ERROR",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "f0b54d3e-4f5b-420d-9b81-6fdc94ec3893",
+      "name": "Log - Extraction Error",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1040,
+        716
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "id-1",
+              "name": "timestamp",
+              "value": "={{ $now.toISO() }}",
+              "type": "string"
+            },
+            {
+              "id": "id-2",
+              "name": "status",
+              "value": "ERROR_AI",
+              "type": "string"
+            },
+            {
+              "id": "id-3",
+              "name": "message_id",
+              "value": "={{ $('08 - Prepare Dedupe Lookup').item.json.message_id }}",
+              "type": "string"
+            },
+            {
+              "id": "id-4",
+              "name": "from_email",
+              "value": "={{ $('08 - Prepare Dedupe Lookup').item.json.from_email }}",
+              "type": "string"
+            },
+            {
+              "id": "id-5",
+              "name": "attachment_name",
+              "value": "={{ $('08 - Prepare Dedupe Lookup').item.json.attachment_name }}",
+              "type": "string"
+            },
+            {
+              "id": "id-6",
+              "name": "error_message",
+              "value": "={{ 'AI processing failed: ' + $json.error }}",
+              "type": "string"
+            },
+            {
+              "id": "event_type_id",
+              "name": "event_type",
+              "value": "AI_ERROR",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "e0820c44-5601-4205-888e-0e56869ee80b",
+      "name": "Log - AI Error",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1040,
+        496
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "id-1",
+              "name": "timestamp",
+              "value": "={{ $now.toISO() }}",
+              "type": "string"
+            },
+            {
+              "id": "id-2",
+              "name": "status",
+              "value": "={{ $('12 - Enhanced Prepare Sheet Data').item.json.status }}",
+              "type": "string"
+            },
+            {
+              "id": "id-3",
+              "name": "message_id",
+              "value": "={{ $('08 - Prepare Dedupe Lookup').item.json.message_id }}",
+              "type": "string"
+            },
+            {
+              "id": "id-4",
+              "name": "from_email",
+              "value": "={{ $('08 - Prepare Dedupe Lookup').item.json.from_email }}",
+              "type": "string"
+            },
+            {
+              "id": "id-5",
+              "name": "attachment_name",
+              "value": "={{ $('08 - Prepare Dedupe Lookup').item.json.attachment_name }}",
+              "type": "string"
+            },
+            {
+              "id": "id-6",
+              "name": "candidate_name",
+              "value": "={{ $('12 - Enhanced Prepare Sheet Data').item.json.name }}",
+              "type": "string"
+            },
+            {
+              "id": "id-7",
+              "name": "error_message",
+              "value": "={{ $('12 - Enhanced Prepare Sheet Data').item.json.status === 'OK_NO_STORAGE' ? 'Drive upload failed but candidate data saved' : 'Success' }}",
+              "type": "string"
+            },
+            {
+              "id": "event_type_id",
+              "name": "event_type",
+              "value": "SUCCESS",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "8190729a-7228-4b30-a77b-0aaf7251a127",
+      "name": "Log - Success",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1040,
+        248
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "67c9efaa-95be-49e2-aca0-7d27c049279d",
+              "leftValue": "={{ $json.text }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            },
+            {
+              "id": "65a7d6b8-0c6b-4edd-bec4-e5b98e719bc6",
+              "leftValue": "={{ ($json.text || \"\").trim().length }}",
+              "rightValue": 300,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "8cbcc6ca-d5d5-4f54-aced-b89193f292fb",
+      "name": "07.5 - Validate Extracted Text1",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -2128,
+        372
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "for (const item of $input.all()) {\n  const binaryKeys = Object.keys(item.binary || {});\n  const attachmentKeys = binaryKeys.filter(k => k.startsWith('attachment'));\n  \n item.json.has_attachments = Boolean(attachmentKeys.length > 0);\n  item.json.attachment_count = attachmentKeys.length;\n  item.json.message_id = item.json.messageId || item.json.message_id || item.json.id || item.json.uid || '';\n  item.json.from_email = item.json.from?.value?.[0]?.address || item.json.from?.[0]?.address || item.json.from || '';\n  item.json.subject = item.json.subject || '';\n}\n\nreturn $input.all();"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -3472,
+        740
+      ],
+      "id": "e609c5a9-6560-490c-a4a2-1942e78312fb",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = [];\n\nfor (const item of $input.all()) {\n  const binaryKeys = Object.keys(item.binary || {});\n  const attachmentKeys = binaryKeys.filter(k => k.startsWith('attachment'));\n  \n  for (const key of attachmentKeys) {\n    items.push({\n      json: {\n        message_id: item.json.message_id || '',\n        from_email: item.json.from_email || '',\n        subject: item.json.subject || '',\n        attachment_key: key,\n        file_name: item.binary[key].fileName || '',\n        mime_type: item.binary[key].mimeType || '',\n        file_extension: (item.binary[key].fileExtension || '').toLowerCase(),\n      },\n      binary: {\n        attachment: item.binary[key]\n      }\n    });\n  }\n}\n\nreturn items;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -3024,
+        548
+      ],
+      "id": "d854267a-31f1-4b31-8b35-7d87a1deb480",
+      "name": "Code in JavaScript1"
+    },
+    {
+      "parameters": {
+        "jsCode": "const originalBinary = $('Code in JavaScript1').first().binary;\n\nreturn [{\n  json: {\n    file_name: $('Code in JavaScript1').first().json.file_name,\n    mime_type: $('Code in JavaScript1').first().json.mime_type,\n  },\n  binary: originalBinary,\n  pairedItem: { item: 0 }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1008,
+        372
+      ],
+      "id": "77735431-8e9c-4f38-8b3a-fb6c992e5bfe",
+      "name": "Code in JavaScript2"
+    },
+    {
+      "parameters": {
+        "schemaType": "manual",
+        "inputSchema": "{\n  \"type\": \"object\",\n  \"properties\": {\n    \"Full_Name\": {\n      \"type\": \"string\",\n      \"description\": \"Full name of the candidate\"\n    },\n    \"Email\": {\n      \"type\": \"string\",\n      \"description\": \"Email address of the candidate\"\n    },\n    \"Phone\": {\n      \"type\": \"string\",\n      \"description\": \"Phone number of the candidate\"\n    },\n    \"Position_Applied\": {\n      \"type\": \"string\",\n      \"description\": \"MUST be exactly one of the Position Titles from the AVAILABLE JOB OPENINGS list provided in the system message. Choose the best match.\"\n    },\n    \"Location\": {\n      \"type\": \"string\",\n      \"description\": \"City and state/country of the candidate\"\n    },\n    \"Years_Experience\": {\n      \"type\": \"string\",\n      \"description\": \"Total years of professional experience as a number\"\n    },\n    \"Skills\": {\n      \"type\": \"string\",\n      \"description\": \"Key skills separated by commas\"\n    },\n    \"Education\": {\n      \"type\": \"string\",\n      \"description\": \"Highest education level or degree\"\n    },\n    \"current_position\": {\n      \"type\": \"string\",\n      \"description\": \"Current or most recent job title\"\n    },\n    \"AI_Score\": {\n      \"type\": \"string\",\n      \"description\": \"Rate the candidate from 1-100 based on overall resume quality, experience relevance, and skills\"\n    },\n    \"AI_Summary\": {\n      \"type\": \"string\",\n      \"description\": \"Brief 2-3 sentence professional summary of the candidate\"\n    }\n  }\n}"
+      },
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.3,
+      "position": [
+        -424,
+        596
+      ],
+      "id": "819898fc-d2f1-45dc-bd21-a04211901de7",
+      "name": "Structured Output Parser2"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=You are an expert HR interviewer specializing in industrial and technical positions.\n\nGenerate exactly 5 tailored interview questions for INTERNAL HR USE ONLY.\n\nCandidate profile:\nFull Name: {{ $input.item.json.fields['Candidate Name'] }}\nPosition Applied: {{ $input.item.json.fields['Suggested Position'] }}\nYears of Experience: {{ $input.item.json.fields['Experience'] }}\nSkills: {{ $input.item.json.fields['Habilities'] }}\nScore: {{ $input.item.json.fields['Score'] }}\nLocation: {{ $input.item.json.fields['Location'] }}\nAI Resume Summary: {{ $input.item.json.fields['Summary'] }}\n\nRules:\n- Questions MUST reference the candidate's ACTUAL skills and experience\n- Include 2 technical questions about their specific skills listed above\n- Include 2 behavioral questions based on their years of experience\n- Include 1 career goals question for the specific position\n- Number each question 1-5\n- Be specific: use their real skills, job title, and experience\n\nOutput ONLY the 5 numbered questions. These are for the interviewer, not the candidate.",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        464,
+        248
+      ],
+      "id": "7fd1e9da-6d15-40c1-9237-ebb46a981655",
+      "name": "AI Agent"
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "gpt-4o-mini",
+          "mode": "list",
+          "cachedResultName": "gpt-4o-mini"
+        },
+        "builtInTools": {},
+        "options": {
+          "maxTokens": 1500
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.3,
+      "position": [
+        536,
+        472
+      ],
+      "id": "be58339c-ea39-4059-83b7-c5e72decf797",
+      "name": "OpenAI Chat Model1",
+      "credentials": {
+        "openAiApi": {
+          "id": "y1kwjvxVnW3RCR04",
+          "name": "OpenAi account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "pollTimes": {
+          "item": [
+            {
+              "mode": "everyX",
+              "value": 5,
+              "unit": "minutes"
+            }
+          ]
+        },
+        "simple": false,
+        "filters": {},
+        "options": {
+          "downloadAttachments": true
+        }
+      },
+      "type": "n8n-nodes-base.gmailTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        -3696,
+        740
+      ],
+      "id": "ede3f50d-1121-4009-bd70-ebe135848509",
+      "name": "Gmail Trigger",
+      "retryOnFail": false,
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "ywLQQstLkR9YAjZH",
+          "name": "Gmail account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "markAsRead",
+        "messageId": "={{ $('Gmail Trigger').item.json.id }}"
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        1488,
+        496
+      ],
+      "id": "91ebf14f-12c3-4ad5-b7cb-394ab8267698",
+      "name": "Mark a message as read",
+      "webhookId": "31215110-c674-4ffd-b12b-9bda95109786",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "ywLQQstLkR9YAjZH",
+          "name": "Gmail account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $json.from_email }}",
+        "subject": "=Re: {{ $('Gmail Trigger').item.json.subject }}",
+        "message": "Hello,  We received your resume but unfortunately we cannot process DOC/DOCX files.   Could you please resend it in PDF format?  Thank you.",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        -2576,
+        548
+      ],
+      "id": "b8e091cc-8263-4270-a418-a4f7dd4e8099",
+      "name": "Send a message",
+      "webhookId": "6494cc57-ca93-4b7b-9156-f6c20d7b4d6e",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "ywLQQstLkR9YAjZH",
+          "name": "Gmail account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "search",
+        "base": {
+          "__rl": true,
+          "value": "appk0B62e0sHOJw8S",
+          "mode": "list",
+          "cachedResultName": "Engineering Project Management",
+          "cachedResultUrl": "https://airtable.com/appk0B62e0sHOJw8S"
+        },
+        "table": {
+          "__rl": true,
+          "value": "tblAJXUvtjqlGsuB6",
+          "mode": "list",
+          "cachedResultName": "Analyzed CVs",
+          "cachedResultUrl": "https://airtable.com/appk0B62e0sHOJw8S/tblAJXUvtjqlGsuB6"
+        },
+        "filterByFormula": "={dedupe_key} = \"{{$json.dedupe_key}}\"",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2.1,
+      "position": [
+        -1680,
+        248
+      ],
+      "id": "3df7f5e6-f74e-49f6-a464-5ae34d1d198c",
+      "name": "Search records",
+      "alwaysOutputData": true,
+      "credentials": {
+        "airtableTokenApi": {
+          "id": "LPCPJePekZ39u5FE",
+          "name": "Airtable Personal Access Token account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "ad72f877-187b-4656-b33c-dfb6ebec7b4d",
+              "name": "text",
+              "value": "={{ $json.ParsedResults[0].ParsedText || \"\" }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -2352,
+        740
+      ],
+      "id": "0e7df57d-587f-44bd-981a-0d4e1d728ec5",
+      "name": "06c - Normalize OCR Text"
+    },
+    {
+      "parameters": {
+        "operation": "create",
+        "base": {
+          "__rl": true,
+          "value": "appk0B62e0sHOJw8S",
+          "mode": "list",
+          "cachedResultName": "Engineering Project Management",
+          "cachedResultUrl": "https://airtable.com/appk0B62e0sHOJw8S"
+        },
+        "table": {
+          "__rl": true,
+          "value": "tblyI4MvhfZM6kBbc",
+          "mode": "list",
+          "cachedResultName": "AI_Logs",
+          "cachedResultUrl": "https://airtable.com/appk0B62e0sHOJw8S/tblyI4MvhfZM6kBbc"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "File Name": "={{ $json.attachment_name }}",
+            "Candidate Name": "={{ $json.candidate_name || \"\" }}",
+            "Status File": "={{ $json.error_message === 'Success' ? 'Success' : 'Error' }}",
+            "File Link": "={{ $json.file_link || \"\" }}",
+            "Error Message": "={{ $json.error_message === 'Success' ? '' : $json.error_message }}",
+            "Date": "={{ $json.timestamp }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "File Name",
+              "displayName": "File Name",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Candidate Name",
+              "displayName": "Candidate Name",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Status File",
+              "displayName": "Status File",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "options",
+              "options": [
+                {
+                  "name": "Success",
+                  "value": "Success"
+                },
+                {
+                  "name": "Error",
+                  "value": "Error"
+                }
+              ],
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "File Link",
+              "displayName": "File Link",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Error Message",
+              "displayName": "Error Message",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Date",
+              "displayName": "Date",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "dateTime",
+              "readOnly": false,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {
+          "typecast": true
+        }
+      },
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2.1,
+      "position": [
+        1264,
+        496
+      ],
+      "id": "6eecc869-50c6-4be3-b080-79b17ce205e3",
+      "name": "Write to AI_Logs",
+      "credentials": {
+        "airtableTokenApi": {
+          "id": "LPCPJePekZ39u5FE",
+          "name": "Airtable Personal Access Token account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "create",
+        "base": {
+          "__rl": true,
+          "value": "appk0B62e0sHOJw8S",
+          "mode": "list",
+          "cachedResultName": "Engineering Project Management",
+          "cachedResultUrl": "https://airtable.com/appk0B62e0sHOJw8S"
+        },
+        "table": {
+          "__rl": true,
+          "value": "tblyI4MvhfZM6kBbc",
+          "mode": "list",
+          "cachedResultName": "AI_Logs",
+          "cachedResultUrl": "https://airtable.com/appk0B62e0sHOJw8S/tblyI4MvhfZM6kBbc"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "File Name": "={{ $json.attachment_name }}",
+            "Candidate Name": "={{ $json.candidate_name || \"\" }}",
+            "Status File": "={{ $json.error_message === 'Success' ? 'Success' : 'Error' }}",
+            "File Link": "={{ $json.file_link || \"\" }}",
+            "Error Message": "={{ $json.error_message === 'Success' ? '' : $json.error_message }}",
+            "Date": "={{ $json.timestamp }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "File Name",
+              "displayName": "File Name",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Candidate Name",
+              "displayName": "Candidate Name",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Status File",
+              "displayName": "Status File",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "options",
+              "options": [
+                {
+                  "name": "Success",
+                  "value": "Success"
+                },
+                {
+                  "name": "Error",
+                  "value": "Error"
+                }
+              ],
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "File Link",
+              "displayName": "File Link",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Error Message",
+              "displayName": "Error Message",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Date",
+              "displayName": "Date",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "dateTime",
+              "readOnly": false,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {
+          "typecast": true
+        }
+      },
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2.1,
+      "position": [
+        1264,
+        716
+      ],
+      "id": "184c67b7-c706-4fb5-b9fb-9db433756e81",
+      "name": "Write to AI_Logs1",
+      "credentials": {
+        "airtableTokenApi": {
+          "id": "LPCPJePekZ39u5FE",
+          "name": "Airtable Personal Access Token account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "create",
+        "base": {
+          "__rl": true,
+          "value": "appk0B62e0sHOJw8S",
+          "mode": "list",
+          "cachedResultName": "Engineering Project Management",
+          "cachedResultUrl": "https://airtable.com/appk0B62e0sHOJw8S"
+        },
+        "table": {
+          "__rl": true,
+          "value": "tblyI4MvhfZM6kBbc",
+          "mode": "list",
+          "cachedResultName": "AI_Logs",
+          "cachedResultUrl": "https://airtable.com/appk0B62e0sHOJw8S/tblyI4MvhfZM6kBbc"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "File Name": "={{ $json.attachment_name }}",
+            "Candidate Name": "={{ $('Analyzed CVs').item.json.fields['Candidate Name'] }}",
+            "Status File": "={{ $json.error_message === 'Success' ? 'Success' : 'Error' }}",
+            "File Link": "={{ $('11 - Upload to Google Drive').item.json.webViewLink }}",
+            "Error Message": "={{ $json.error_message === 'Success' ? '' : $json.error_message }}",
+            "Date": "={{ $json.timestamp.substring(0, 10) }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "File Name",
+              "displayName": "File Name",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Candidate Name",
+              "displayName": "Candidate Name",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Status File",
+              "displayName": "Status File",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "options",
+              "options": [
+                {
+                  "name": "Success",
+                  "value": "Success"
+                },
+                {
+                  "name": "Error",
+                  "value": "Error"
+                }
+              ],
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "File Link",
+              "displayName": "File Link",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Error Message",
+              "displayName": "Error Message",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Date",
+              "displayName": "Date",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "dateTime",
+              "readOnly": false,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {
+          "typecast": true
+        }
+      },
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2.1,
+      "position": [
+        1264,
+        248
+      ],
+      "id": "a66292b3-6b11-4f0b-b73c-31ba5154b52e",
+      "name": "Write to AI_Logs2",
+      "credentials": {
+        "airtableTokenApi": {
+          "id": "LPCPJePekZ39u5FE",
+          "name": "Airtable Personal Access Token account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "create",
+        "base": {
+          "__rl": true,
+          "value": "appk0B62e0sHOJw8S",
+          "mode": "list",
+          "cachedResultName": "Engineering Project Management",
+          "cachedResultUrl": "https://airtable.com/appk0B62e0sHOJw8S"
+        },
+        "table": {
+          "__rl": true,
+          "value": "tblyI4MvhfZM6kBbc",
+          "mode": "list",
+          "cachedResultName": "AI_Logs",
+          "cachedResultUrl": "https://airtable.com/appk0B62e0sHOJw8S/tblyI4MvhfZM6kBbc"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Status File": "={{ $json.status }}",
+            "Error Message": "={{ $json.error_message }}",
+            "File Name": "={{ $json.attachment_name }}",
+            "Date": "={{ $json.timestamp }}",
+            "Candidate Name": "={{ $('10 - IF Is Duplicate').item.json['Candidate Name'] }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "File Name",
+              "displayName": "File Name",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Candidate Name",
+              "displayName": "Candidate Name",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Status File",
+              "displayName": "Status File",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "options",
+              "options": [
+                {
+                  "name": "Success",
+                  "value": "Success"
+                },
+                {
+                  "name": "Error",
+                  "value": "Error"
+                },
+                {
+                  "name": "DUPLICATE",
+                  "value": "DUPLICATE"
+                }
+              ],
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "File Link",
+              "displayName": "File Link",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "Error Message",
+              "displayName": "Error Message",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Date",
+              "displayName": "Date",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "dateTime",
+              "readOnly": false,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {
+          "typecast": true
+        }
+      },
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2.1,
+      "position": [
+        1264,
+        0
+      ],
+      "id": "1d05dea5-04a6-42a8-b64d-f8129341ea2b",
+      "name": "Write to AI_Logs3",
+      "alwaysOutputData": true,
+      "credentials": {
+        "airtableTokenApi": {
+          "id": "LPCPJePekZ39u5FE",
+          "name": "Airtable Personal Access Token account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "create",
+        "base": {
+          "__rl": true,
+          "value": "appk0B62e0sHOJw8S",
+          "mode": "list",
+          "cachedResultName": "Engineering Project Management",
+          "cachedResultUrl": "https://airtable.com/appk0B62e0sHOJw8S"
+        },
+        "table": {
+          "__rl": true,
+          "value": "tblyI4MvhfZM6kBbc",
+          "mode": "list",
+          "cachedResultName": "AI_Logs",
+          "cachedResultUrl": "https://airtable.com/appk0B62e0sHOJw8S/tblyI4MvhfZM6kBbc"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "File Name": "={{ $json.attachment_name }}",
+            "Candidate Name": "={{ $json.candidate_name || \"\" }}",
+            "Status File": "={{ $json.error_message === 'Success' ? 'Success' : 'Error' }}",
+            "File Link": "={{ $json.file_link || \"\" }}",
+            "Error Message": "={{ $json.error_message === 'Success' ? '' : $json.error_message }}",
+            "Date": "={{ $json.timestamp }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "File Name",
+              "displayName": "File Name",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Candidate Name",
+              "displayName": "Candidate Name",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Status File",
+              "displayName": "Status File",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "options",
+              "options": [
+                {
+                  "name": "Success",
+                  "value": "Success"
+                },
+                {
+                  "name": "Error",
+                  "value": "Error"
+                }
+              ],
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "File Link",
+              "displayName": "File Link",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Error Message",
+              "displayName": "Error Message",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Date",
+              "displayName": "Date",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "dateTime",
+              "readOnly": false,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {
+          "typecast": true
+        }
+      },
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2.1,
+      "position": [
+        1264,
+        908
+      ],
+      "id": "e49d6218-7f79-4275-a10c-916b877e065b",
+      "name": "Write to AI_Logs4",
+      "credentials": {
+        "airtableTokenApi": {
+          "id": "LPCPJePekZ39u5FE",
+          "name": "Airtable Personal Access Token account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "create",
+        "base": {
+          "__rl": true,
+          "value": "appk0B62e0sHOJw8S",
+          "mode": "list",
+          "cachedResultName": "Engineering Project Management",
+          "cachedResultUrl": "https://airtable.com/appk0B62e0sHOJw8S"
+        },
+        "table": {
+          "__rl": true,
+          "value": "tblAJXUvtjqlGsuB6",
+          "mode": "list",
+          "cachedResultName": "Analyzed CVs",
+          "cachedResultUrl": "https://airtable.com/appk0B62e0sHOJw8S/tblAJXUvtjqlGsuB6"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Candidate Name": "={{ $('AI Agent - Resume Analyzer').item.json.output.Full_Name }}",
+            "Phone number": "={{ $('AI Agent - Resume Analyzer').item.json.output.Phone }}",
+            "Experience": "={{ $('AI Agent - Resume Analyzer').item.json.output.Years_Experience + \" years\" }}",
+            "Habilities": "={{ $('AI Agent - Resume Analyzer').item.json.output.Skills }}",
+            "Location": "={{ $('AI Agent - Resume Analyzer').item.json.output.Location }}",
+            "Suggested Position": "={{ $('AI Agent - Resume Analyzer').item.json.output.Position_Applied }}",
+            "Score": "={{ $('AI Agent - Resume Analyzer').item.json.output.AI_Score }}",
+            "Summary": "={{ $('AI Agent - Resume Analyzer').item.json.output.AI_Summary }}",
+            "Related Job Opening": "={{ [$('Get Job Openings1').item.json.id] }}",
+            "dedupe_key": "={{ $('08 - Prepare Dedupe Lookup').item.json.dedupe_key }}",
+            "Email": "={{ $json.Email }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "Candidate Name",
+              "displayName": "Candidate Name",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Email",
+              "displayName": "Email",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Phone number",
+              "displayName": "Phone number",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Experience",
+              "displayName": "Experience",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Habilities",
+              "displayName": "Habilities",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Location",
+              "displayName": "Location",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Suggested Position",
+              "displayName": "Suggested Position",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Score",
+              "displayName": "Score",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Summary",
+              "displayName": "Summary",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "File Link",
+              "displayName": "File Link",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "Related Job Opening",
+              "displayName": "Related Job Opening",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "array",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Client",
+              "displayName": "Client",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "array",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Status",
+              "displayName": "Status",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "options",
+              "options": [
+                {
+                  "name": "Pending",
+                  "value": "Pending"
+                },
+                {
+                  "name": "Interviewed",
+                  "value": "Interviewed"
+                },
+                {
+                  "name": "Rejected",
+                  "value": "Rejected"
+                },
+                {
+                  "name": "Hired",
+                  "value": "Hired"
+                }
+              ],
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "dedupe_key",
+              "displayName": "dedupe_key",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2.1,
+      "position": [
+        240,
+        248
+      ],
+      "id": "a846e1b9-6424-4a91-9e28-fb80f5fb0249",
+      "name": "Analyzed CVs",
+      "credentials": {
+        "airtableTokenApi": {
+          "id": "LPCPJePekZ39u5FE",
+          "name": "Airtable Personal Access Token account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "search",
+        "base": {
+          "__rl": true,
+          "value": "appk0B62e0sHOJw8S",
+          "mode": "list",
+          "cachedResultName": "Engineering Project Management",
+          "cachedResultUrl": "https://airtable.com/appk0B62e0sHOJw8S"
+        },
+        "table": {
+          "__rl": true,
+          "value": "tblwphXlHA2wtVsm0",
+          "mode": "list",
+          "cachedResultName": "Job Openings",
+          "cachedResultUrl": "https://airtable.com/appk0B62e0sHOJw8S/tblwphXlHA2wtVsm0"
+        },
+        "filterByFormula": "={Position Title} = \"{{ $json.output.Position_Applied }}\"",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2.1,
+      "position": [
+        -208,
+        248
+      ],
+      "id": "b907783b-040e-4d24-86ea-67772e634c16",
+      "name": "Get Job Openings1",
+      "alwaysOutputData": true,
+      "credentials": {
+        "airtableTokenApi": {
+          "id": "LPCPJePekZ39u5FE",
+          "name": "Airtable Personal Access Token account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "search",
+        "base": {
+          "__rl": true,
+          "value": "appk0B62e0sHOJw8S",
+          "mode": "list",
+          "cachedResultName": "Engineering Project Management",
+          "cachedResultUrl": "https://airtable.com/appk0B62e0sHOJw8S"
+        },
+        "table": {
+          "__rl": true,
+          "value": "tblwphXlHA2wtVsm0",
+          "mode": "list",
+          "cachedResultName": "Job Openings",
+          "cachedResultUrl": "https://airtable.com/appk0B62e0sHOJw8S/tblwphXlHA2wtVsm0"
+        },
+        "filterByFormula": "=",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2.1,
+      "position": [
+        -1232,
+        372
+      ],
+      "id": "086c5d0d-3a58-4fdf-9b67-3cf6b23fb614",
+      "name": "Get Job Openings",
+      "credentials": {
+        "airtableTokenApi": {
+          "id": "LPCPJePekZ39u5FE",
+          "name": "Airtable Personal Access Token account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Extract Text from PDF": {
+      "main": [
+        [
+          {
+            "node": "07.5 - Validate Extracted Text1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent - Resume Analyzer": {
+      "main": [
+        [
+          {
+            "node": "Log - AI Error",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Get Job Openings1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent - Resume Analyzer",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "02 - IF Has Attachments": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Log - No Attachments",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "05 - Route by File Type": {
+      "main": [
+        [
+          {
+            "node": "Extract Text from PDF",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send a message",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "06b - OCR for Images",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "06b - OCR for Images": {
+      "main": [
+        [
+          {
+            "node": "06c - Normalize OCR Text",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "08 - Prepare Dedupe Lookup": {
+      "main": [
+        [
+          {
+            "node": "Search records",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "10 - IF Is Duplicate": {
+      "main": [
+        [
+          {
+            "node": "Log - Duplicate Found",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Get Job Openings",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "11 - Upload to Google Drive": {
+      "main": [
+        [
+          {
+            "node": "AI Agent - Resume Analyzer",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "12 - Enhanced Prepare Sheet Data": {
+      "main": [
+        [
+          {
+            "node": "Analyzed CVs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Confirmation Email": {
+      "main": [
+        [
+          {
+            "node": "Log - Success",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log - No Attachments": {
+      "main": [
+        [
+          {
+            "node": "Write to AI_Logs4",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log - Duplicate Found": {
+      "main": [
+        [
+          {
+            "node": "Write to AI_Logs3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log - Extraction Error": {
+      "main": [
+        [
+          {
+            "node": "Write to AI_Logs1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log - AI Error": {
+      "main": [
+        [
+          {
+            "node": "Write to AI_Logs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log - Success": {
+      "main": [
+        [
+          {
+            "node": "Write to AI_Logs2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "07.5 - Validate Extracted Text1": {
+      "main": [
+        [
+          {
+            "node": "08 - Prepare Dedupe Lookup",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Log - Extraction Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "02 - IF Has Attachments",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript1": {
+      "main": [
+        [
+          {
+            "node": "05 - Route by File Type",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript2": {
+      "main": [
+        [
+          {
+            "node": "11 - Upload to Google Drive",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Structured Output Parser2": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "AI Agent - Resume Analyzer",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent": {
+      "main": [
+        [
+          {
+            "node": "Send Confirmation Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model1": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gmail Trigger": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Search records": {
+      "main": [
+        [
+          {
+            "node": "10 - IF Is Duplicate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "06c - Normalize OCR Text": {
+      "main": [
+        [
+          {
+            "node": "07.5 - Validate Extracted Text1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Write to AI_Logs4": {
+      "main": [
+        [
+          {
+            "node": "Mark a message as read",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Write to AI_Logs": {
+      "main": [
+        [
+          {
+            "node": "Mark a message as read",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Write to AI_Logs2": {
+      "main": [
+        [
+          {
+            "node": "Mark a message as read",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Write to AI_Logs3": {
+      "main": [
+        [
+          {
+            "node": "Mark a message as read",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Write to AI_Logs1": {
+      "main": [
+        [
+          {
+            "node": "Mark a message as read",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Analyzed CVs": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Job Openings1": {
+      "main": [
+        [
+          {
+            "node": "12 - Enhanced Prepare Sheet Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Job Openings": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "3cac2036-9fa0-4b71-8d19-dba48bacee62",
+  "meta": {
+    "instanceId": "d0996c5ea8fa280565fde8b2cfb882859b9992222c637bea119e17ad257cd681"
+  },
+  "id": "ZxkFrGd14hmkn784",
+  "tags": []
+}
