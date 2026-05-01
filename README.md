@@ -27,10 +27,24 @@ The system improves efficiency, consistency, and recruiter visibility, while ens
 *   **Rodrigo Sierra**
 *   **Jaya Verma**
 
+**Course:** Artificial Intelligence Resource Reference – ITAI 2376  
+**Instructor:** Professor Sitaram Ayyagari  
+**Date:** April 29, 2026
+
 ---
 
 ## 🔄 System Flow
 
+```mermaid
+graph TD
+    A[Gmail: Resume Intake] --> B[Google Drive: Secure Storage]
+    B --> C[AI Agent 1: Resume Analyzer]
+    C --> D{Job Match?}
+    D -- No --> E[Reject/Log Error]
+    D -- Yes --> F[AI Agent 2: HR Interviewer]
+    F --> G[Generate Custom Questions]
+    G --> H[Update Airtable Database]
+    H --> I[Recruiter Final Review]
 ```
 
 1.  **Resume Intake:** Resumes arrive via email (Gmail API). Attachments are automatically stored in Google Drive.
@@ -78,7 +92,6 @@ The system utilizes a specialized multi-agent architecture to ensure high accura
 *   **[Gmail API](https://developers.google.com/gmail/api):** Resume intake and email triggers.
 *   **[Google Drive](https://www.google.com/drive/):** Secure resume storage.
 *   **[Airtable](https://airtable.com/):** Candidate database, logs, and recruiter dashboard.
-*   **Resumes: dataset of resumes**
 
 ---
 
@@ -105,4 +118,6 @@ To import this workflow into your n8n instance:
 1. Download the `Automated Resume Processing.json` file.
 2. In n8n, click on **Workflows** > **Import from File**.
 3. Configure your Credentials for Gmail, Google Drive, OpenAI, and Airtable.
+4. Set the `Airtable Base ID` in the Search and Create nodes.
+rive, OpenAI, and Airtable.
 4. Set the `Airtable Base ID` in the Search and Create nodes.
