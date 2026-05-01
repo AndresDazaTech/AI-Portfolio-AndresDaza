@@ -31,8 +31,6 @@ The system improves efficiency, consistency, and recruiter visibility, while ens
 
 ## 🔄 System Flow
 
-```![Uploading image.png…]()
-
 ```
 
 1.  **Resume Intake:** Resumes arrive via email (Gmail API). Attachments are automatically stored in Google Drive.
@@ -80,7 +78,7 @@ The system utilizes a specialized multi-agent architecture to ensure high accura
 *   **[Gmail API](https://developers.google.com/gmail/api):** Resume intake and email triggers.
 *   **[Google Drive](https://www.google.com/drive/):** Secure resume storage.
 *   **[Airtable](https://airtable.com/):** Candidate database, logs, and recruiter dashboard.
-*   **[OCR.space](https://ocr.space/):** Optical Character Recognition for image-based resumes.
+*   **Resumes: dataset of resumes**
 
 ---
 
