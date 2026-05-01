@@ -31,16 +31,8 @@ The system improves efficiency, consistency, and recruiter visibility, while ens
 
 ## 🔄 System Flow
 
-```mermaid
-graph TD
-    A[Gmail: Resume Intake] --> B[Google Drive: Secure Storage]
-    B --> C[AI Agent 1: Resume Analyzer]
-    C --> D{Job Match?}
-    D -- No --> E[Reject/Log Error]
-    D -- Yes --> F[AI Agent 2: HR Interviewer]
-    F --> G[Generate Custom Questions]
-    G --> H[Update Airtable Database]
-    H --> I[Recruiter Final Review]
+```![Uploading image.png…]()
+
 ```
 
 1.  **Resume Intake:** Resumes arrive via email (Gmail API). Attachments are automatically stored in Google Drive.
