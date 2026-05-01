@@ -27,10 +27,6 @@ The system improves efficiency, consistency, and recruiter visibility, while ens
 *   **Rodrigo Sierra**
 *   **Jaya Verma**
 
-**Course:** Artificial Intelligence Resource Reference – ITAI 2376  
-**Instructor:** Professor Sitaram Ayyagari  
-**Date:** April 29, 2026
-
 ---
 
 ## 🔄 System Flow
