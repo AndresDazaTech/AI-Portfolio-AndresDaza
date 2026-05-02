@@ -65,6 +65,8 @@ The system utilizes a specialized multi-agent architecture to ensure high accura
 *   **Task:** Generates role-specific interview questions based on the analysis from Agent 1.
 *   **Benefit:** Optimized for speed and specific task generation.
 
+**Both models are accessed via the official OpenAI Python SDK.**
+
 ---
 
 ## 📊 Candidate Evaluation Logic
